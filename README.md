@@ -1,0 +1,183 @@
+# HSE PDF Report Generator
+
+A NestJS service for generating PDF reports by combining web page content (via Playwright) and external API data.
+
+## 📌 Project Goals
+
+Create an HTTP service on NestJS that:
+
+1. Accepts requests at `/report/:type` endpoint
+2. Uses Playwright to:
+   - Navigate to specified websites
+   - Interact with page elements (buttons, etc.)
+   - Wait for graph loading
+   - Generate PDFs of entire pages or specific graphs
+3. Fetches additional data from external APIs
+4. Generates final PDFs containing:
+   - Website content (via Playwright PDF)
+   - Data blocks from external APIs
+5. Returns the generated PDF in the response
+
+## 🧱 Project Structure
+
+```
+src/
+├── app.module.ts
+├── main.ts
+│
+├── report/
+│   ├── report.controller.ts  ← Main HTTP endpoint
+│   ├── report.service.ts     ← Coordination of all actions
+│
+├── browser/
+│   ├── browser.module.ts
+│   ├── playwright.service.ts ← Playwright logic (navigation + PDF)
+│
+├── external/
+│   ├── external.module.ts
+│   ├── external.service.ts   ← External API requests
+│
+├── templates/
+│   └── header-footer.html    ← HTML template for PDF header/footer
+│
+└── config/
+    └── report-config.ts      ← Settings for each report type
+```
+
+## 🔁 Process Flow
+
+1. Client makes a GET request to `/report/:type`
+2. ReportService:
+   - Loads configuration by type
+   - Initializes browser via PlaywrightService
+   - Navigates and interacts with the website
+   - Generates PDF using page.pdf()
+   - Fetches data from external APIs
+   - Generates final PDF (combined or with header/footer)
+   - Returns the PDF
+
+## 🛠️ Implementation Details
+
+### PlaywrightService (playwright.service.ts)
+```typescript
+import { Injectable } from '@nestjs/common';
+import { chromium } from 'playwright';
+
+@Injectable()
+export class PlaywrightService {
+  async generatePdfFromSite(config: ReportConfig): Promise<Buffer> {
+    const browser = await chromium.launch();
+    const page = await browser.newPage({
+      viewport: config.viewport,
+    });
+
+    await page.goto(config.url);
+    for (const selector of config.buttons) {
+      await page.click(selector);
+    }
+
+    await page.waitForSelector(config.graphSelector);
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '60px', bottom: '60px', left: '40px', right: '40px' },
+      displayHeaderFooter: true,
+      headerTemplate: '<span style="font-size:10px;">Header</span>',
+      footerTemplate: '<span style="font-size:10px;">Page <span class="pageNumber"></span></span>',
+    });
+
+    await browser.close();
+    return pdfBuffer;
+  }
+}
+```
+
+### ExternalService (external.service.ts)
+```typescript
+async fetchData(reportType: string): Promise<any> {
+  const config = reportConfigs[reportType];
+  const { data } = await axios.get(config.externalApi);
+  return data;
+}
+```
+
+### ReportService (report.service.ts)
+```typescript
+async generateFullReport(type: string): Promise<Buffer> {
+  const config = reportConfigs[type];
+
+  // 1. Get site PDF via Playwright
+  const sitePdf = await this.playwrightService.generatePdfFromSite(config);
+
+  // 2. Get additional data (if needed for separate page)
+  const extraData = await this.externalService.fetchData(type);
+
+  // 3. Generate final PDF (combine)
+  // Simple way: return sitePdf
+  // Advanced way: merge PDFs with data using pdf-lib
+
+  return sitePdf;
+}
+```
+
+### Example Configuration (config/report-config.ts)
+```typescript
+export const reportConfigs = {
+  sales: {
+    url: 'https://example.com/sales',
+    buttons: ['#loadSales', '#showCharts'],
+    graphSelector: '#salesChart',
+    externalApi: 'https://api.example.com/sales',
+    viewport: { width: 1280, height: 720 },
+  },
+  finance: {
+    // another report configuration
+  },
+};
+```
+
+### Controller (report.controller.ts)
+```typescript
+@Get(':type')
+async handleReport(@Param('type') type: string, @Res() res: Response) {
+  const buffer = await this.reportService.generateFullReport(type);
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${type}-report.pdf"`,
+  });
+  res.send(buffer);
+}
+```
+
+## 📅 Development Timeline
+
+| Stage | Task | Time |
+|-------|------|------|
+| 1 | NestJS and module setup | 1 day |
+| 2 | Playwright PDF logic implementation | 1 day |
+| 3 | External API data fetching | 0.5 days |
+| 4 | ReportService integration | 1 day |
+| 5 | PDF customization (header/footer, graphs) | 1 day |
+| 6 | Testing and final adjustments | 1 day |
+
+## 🚀 Getting Started
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Start the development server:
+```bash
+npm run start:dev
+```
+
+3. Access Swagger documentation at:
+```
+http://localhost:3000/api
+```
+
+## 📝 API Endpoints
+
+- `GET /report/:type` - Generate a PDF report for the specified type 
