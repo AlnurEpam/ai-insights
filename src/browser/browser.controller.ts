@@ -2,10 +2,23 @@ import { Controller, Post, Body, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { PlaywrightService } from './playwright.service';
 import { ReportConfig, defaultConfig } from '../config/report-config';
-import { ApiOperation, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiBody, ApiResponse, ApiTags, ApiProperty } from '@nestjs/swagger';
 
 class ScreenshotRequestDto {
+  @ApiProperty({
+    description: 'Company/Project name to search for',
+    required: false,
+    example: 'at  ADNOC'
+  })
   name?: string;
+
+  @ApiProperty({
+    description: 'Time period for the report',
+    enum: ['D', 'M', 'W'],
+    example: 'M',
+    required: false
+  })
+  period?: 'D' | 'M' | 'W';
 }
 
 @ApiTags('Browser')
@@ -17,15 +30,15 @@ export class BrowserController {
   @ApiOperation({ summary: 'Take a screenshot of the graph' })
   @ApiBody({
     type: ScreenshotRequestDto,
-    description: 'Company/Project name to search for',
+    description: 'Request parameters for screenshot',
     examples: {
       example1: {
-        value: { name: 'at  ADNOC' },
-        description: 'Example with ADNOC'
+        value: { name: 'at  ADNOC', period: 'M' },
+        description: 'Example with ADNOC and monthly period'
       },
       example2: {
-        value: { name: 'at  ADNOC Onshore' },
-        description: 'Example with ADNOC Onshore'
+        value: { name: 'at  ADNOC Onshore', period: 'W' },
+        description: 'Example with ADNOC Onshore and weekly period'
       }
     }
   })
@@ -46,16 +59,24 @@ export class BrowserController {
     description: 'Error occurred while taking screenshot'
   })
   async takeScreenshot(@Body() body: ScreenshotRequestDto, @Res() res: Response) {
-    // Create a new config based on defaultConfig but with the name from body
+    // Create a new config based on defaultConfig but with the name and period from body
     const config: ReportConfig = {
       ...defaultConfig,
       name: body.name || defaultConfig.name,
+      period: body.period || defaultConfig.period,
       buttons: defaultConfig.buttons.map(button => {
         // Update the selector for the element with id if name is provided
         if (button.selector.includes('id=')) {
           return {
             ...button,
             selector: `[id="${body.name || defaultConfig.name}"]`
+          };
+        }
+        // Update the searchText for period button if period is provided
+        if (button.selector.includes('StyledChartDateRangeBtn')) {
+          return {
+            ...button,
+            searchText: body.period || defaultConfig.period
           };
         }
         return button;
