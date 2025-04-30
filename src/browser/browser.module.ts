@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { BrowserController } from './browser.controller';
-import { SharedModule } from '../shared/shared.module';
+import { BrowserService } from './browser.service';
+import { PlaywrightService } from '../shared/playwright.service';
 
 @Module({
-  imports: [SharedModule],
   controllers: [BrowserController],
+  providers: [BrowserService, PlaywrightService],
+  exports: [BrowserService]
 })
 export class BrowserModule {} 

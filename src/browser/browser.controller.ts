@@ -1,7 +1,6 @@
 import { Controller, Post, Body, Res } from '@nestjs/common';
 import { Response } from 'express';
-import { PlaywrightService } from '../shared/playwright.service';
-import { BrowserConfig, browserConfig } from './browser.config';
+import { BrowserService } from './browser.service';
 import { ApiOperation, ApiBody, ApiResponse, ApiTags, ApiProperty } from '@nestjs/swagger';
 
 class ScreenshotRequestDto {
@@ -24,7 +23,7 @@ class ScreenshotRequestDto {
 @ApiTags('Browser')
 @Controller('browser')
 export class BrowserController {
-  constructor(private readonly playwrightService: PlaywrightService) {}
+  constructor(private readonly browserService: BrowserService) {}
 
   @Post('screenshot')
   @ApiOperation({ summary: 'Take a screenshot of the graph' })
@@ -59,67 +58,14 @@ export class BrowserController {
     description: 'Error occurred while taking screenshot'
   })
   async takeScreenshot(@Body() body: ScreenshotRequestDto, @Res() res: Response) {
-    // Create a new config based on defaultConfig but with the name and period from body
-    const config: BrowserConfig = {
-      ...browserConfig,
-      name: body.name || browserConfig.name,
-      period: body.period || browserConfig.period,
-      buttons: browserConfig.buttons.map(button => {
-        // Update the selector for the element with id if name is provided
-        if (button.selector.includes('id=')) {
-          return {
-            ...button,
-            selector: `[id="${body.name || browserConfig.name}"]`
-          };
-        }
-        // Update the searchText for period button if period is provided
-        if (button.selector.includes('StyledChartDateRangeBtn')) {
-          return {
-            ...button,
-            searchText: body.period || browserConfig.period
-          };
-        }
-        return button;
-      })
-    };
-
-    const browser = await this.playwrightService.launchBrowser();
-    const page = await browser.newPage({
-      viewport: config.viewport
-    });
-    
     try {
-      await page.goto(config.url, { waitUntil: 'networkidle' });
-      
-      // Click each button in sequence
-      for (const button of config.buttons) {
-        await this.playwrightService.clickButton(page, button);
-      }
-
-      // Wait for the specified delay before taking screenshot
-      if (config.delay) {
-        console.log(`Waiting for ${config.delay}ms before taking screenshot...`);
-        await new Promise(resolve => setTimeout(resolve, config.delay));
-      }
-
-      // Wait for the graph to be visible
-      console.log(`Waiting for graph selector: ${config.graphSelector}`);
-      await page.waitForSelector(config.graphSelector, { timeout: 30000 });
-      
-      // Take screenshot of only the graph
-      const graphElement = await page.$(config.graphSelector);
-      if (!graphElement) {
-        throw new Error(`Graph element with selector ${config.graphSelector} not found`);
-      }
-      
-      const screenshot = await graphElement.screenshot();
+      const config = this.browserService.createConfig(body.name, body.period);
+      const screenshot = await this.browserService.takeScreenshot(config);
       
       res.setHeader('Content-Type', 'image/png');
       res.send(screenshot);
     } catch (error) {
       res.status(500).json({ error: error.message });
-    } finally {
-      await browser.close();
     }
   }
 } 
