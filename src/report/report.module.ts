@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ReportController } from './report.controller';
-import { SharedModule } from '../shared/shared.module';
-import { ExternalModule } from '../external/external.module';
+import { PlaywrightService } from '../shared/playwright.service';
+import { BrowserModule } from '../browser/browser.module';
 
 @Module({
-  imports: [SharedModule, ExternalModule],
+  imports: [BrowserModule],
   controllers: [ReportController],
+  providers: [PlaywrightService],
 })
 export class ReportModule {} 

@@ -11,45 +11,29 @@ export class PlaywrightService {
     });
   }
 
-  async generatePdfFromSite(config: ReportConfig): Promise<Buffer> {
+  async generatePdfFromSite(screenshot: Buffer): Promise<Buffer> {
     const browser = await chromium.launch();
     const page = await browser.newPage();
+    
+    // Create HTML with the screenshot
+    const html = `
+      <html>
+        <body style="margin: 0; padding: 0;">
+          <img src="data:image/png;base64,${screenshot.toString('base64')}" style="width: 100%; height: auto;">
+        </body>
+      </html>
+    `;
 
-    try {
-      console.log(`Navigating to URL: ${config.url}`);
-      await page.goto(config.url, { waitUntil: 'networkidle' });
-      
-      // Click all required buttons if they exist
-      if (config.buttons) {
-        for (const button of config.buttons) {
-          console.log(`Attempting to click button with selector: ${button.selector}`);
-          await this.clickButton(page, button);
-        }
-      }
+    await page.setContent(html);
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' }
+    });
 
-      // Wait for graph if selector is provided
-      if (config.graphSelector) {
-        console.log(`Waiting for graph selector: ${config.graphSelector}`);
-        await page.waitForSelector(config.graphSelector, { timeout: 30000 });
-      }
-
-      // Generate PDF with header and footer
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '60px', bottom: '60px', left: '40px', right: '40px' },
-        displayHeaderFooter: true,
-        headerTemplate: '<span style="font-size:10px;">Report Header</span>',
-        footerTemplate: '<span style="font-size:10px;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>',
-      });
-
-      return pdfBuffer;
-    } catch (error) {
-      console.error('Error in generatePdfFromSite:', error);
-      throw error;
-    } finally {
-      await browser.close();
-    }
+    await browser.close();
+    return pdfBuffer;
   }
 
   async clickButton(page: Page, button: { selector: string; searchText?: string; clickCount?: number; waitAfterClick?: number }): Promise<void> {
