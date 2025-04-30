@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { chromium, Browser, Page } from 'playwright';
-import { ReportConfig, ButtonConfig } from '../config/report-config';
+import { ReportConfig } from '../report/report.config';
 
 @Injectable()
 export class PlaywrightService {
@@ -19,15 +19,19 @@ export class PlaywrightService {
       console.log(`Navigating to URL: ${config.url}`);
       await page.goto(config.url, { waitUntil: 'networkidle' });
       
-      // Click all required buttons
-      for (const button of config.buttons) {
-        console.log(`Attempting to click button with selector: ${button.selector}`);
-        await this.clickButton(page, button);
+      // Click all required buttons if they exist
+      if (config.buttons) {
+        for (const button of config.buttons) {
+          console.log(`Attempting to click button with selector: ${button.selector}`);
+          await this.clickButton(page, button);
+        }
       }
 
-      console.log(`Waiting for graph selector: ${config.graphSelector}`);
-      // Wait for the graph to load
-      await page.waitForSelector(config.graphSelector, { timeout: 30000 });
+      // Wait for graph if selector is provided
+      if (config.graphSelector) {
+        console.log(`Waiting for graph selector: ${config.graphSelector}`);
+        await page.waitForSelector(config.graphSelector, { timeout: 30000 });
+      }
 
       // Generate PDF with header and footer
       const pdfBuffer = await page.pdf({
@@ -48,55 +52,55 @@ export class PlaywrightService {
     }
   }
 
-  async clickButton(page: Page, buttonConfig: ButtonConfig): Promise<void> {
+  async clickButton(page: Page, button: { selector: string; searchText?: string; clickCount?: number; waitAfterClick?: number }): Promise<void> {
     try {
       // If we need to search by text content
-      if (buttonConfig.searchText) {
-        console.log(`Searching for element containing text: ${buttonConfig.searchText}`);
+      if (button.searchText) {
+        console.log(`Searching for element containing text: ${button.searchText}`);
         
         // Wait for any element matching the selector
-        await page.waitForSelector(buttonConfig.selector, {
+        await page.waitForSelector(button.selector, {
           state: 'attached',
           timeout: 10000
         });
 
         // Find element containing the specific text
-        const elements = await page.$$(buttonConfig.selector);
+        const elements = await page.$$(button.selector);
         for (const element of elements) {
           const text = await element.textContent();
-          if (text && text.includes(buttonConfig.searchText)) {
-            console.log(`Found element with matching text: ${buttonConfig.searchText}`);
+          if (text && text.includes(button.searchText)) {
+            console.log(`Found element with matching text: ${button.searchText}`);
             // Click the element specified number of times
-            for (let i = 0; i < buttonConfig.clickCount; i++) {
+            for (let i = 0; i < (button.clickCount || 1); i++) {
               await element.click();
-              if (buttonConfig.waitAfterClick) {
-                await new Promise(resolve => setTimeout(resolve, buttonConfig.waitAfterClick));
+              if (button.waitAfterClick) {
+                await new Promise(resolve => setTimeout(resolve, button.waitAfterClick));
               }
             }
             return;
           }
         }
-        throw new Error(`No element found containing text: ${buttonConfig.searchText}`);
+        throw new Error(`No element found containing text: ${button.searchText}`);
       }
 
       // Regular button click without text search
-      await page.waitForSelector(buttonConfig.selector, {
+      await page.waitForSelector(button.selector, {
         state: 'visible',
         timeout: 10000
       });
 
       // Click the button specified number of times
-      for (let i = 0; i < buttonConfig.clickCount; i++) {
-        console.log(`Clicking button (${i + 1}/${buttonConfig.clickCount})`);
-        await page.click(buttonConfig.selector, { timeout: 5000 });
+      for (let i = 0; i < (button.clickCount || 1); i++) {
+        console.log(`Clicking button (${i + 1}/${button.clickCount || 1})`);
+        await page.click(button.selector, { timeout: 5000 });
         
-        if (buttonConfig.waitAfterClick) {
-          console.log(`Waiting ${buttonConfig.waitAfterClick}ms after click`);
-          await new Promise(resolve => setTimeout(resolve, buttonConfig.waitAfterClick));
+        if (button.waitAfterClick) {
+          console.log(`Waiting ${button.waitAfterClick}ms after click`);
+          await new Promise(resolve => setTimeout(resolve, button.waitAfterClick));
         }
       }
     } catch (error) {
-      console.error(`Error clicking button with selector "${buttonConfig.selector}":`, error);
+      console.error(`Error clicking button with selector "${button.selector}":`, error);
       throw error;
     }
   }

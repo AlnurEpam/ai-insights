@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
-import { reportConfigs } from '../config/report-config';
+import { reportConfigs } from '../report/report.config';
 
 @Injectable()
 export class ExternalService {

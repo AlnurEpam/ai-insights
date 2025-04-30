@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { PlaywrightService } from '../shared/playwright.service';
-import { ReportConfig, defaultConfig } from '../config/report-config';
+import { BrowserConfig, browserConfig } from './browser.config';
 import { ApiOperation, ApiBody, ApiResponse, ApiTags, ApiProperty } from '@nestjs/swagger';
 
 class ScreenshotRequestDto {
@@ -60,23 +60,23 @@ export class BrowserController {
   })
   async takeScreenshot(@Body() body: ScreenshotRequestDto, @Res() res: Response) {
     // Create a new config based on defaultConfig but with the name and period from body
-    const config: ReportConfig = {
-      ...defaultConfig,
-      name: body.name || defaultConfig.name,
-      period: body.period || defaultConfig.period,
-      buttons: defaultConfig.buttons.map(button => {
+    const config: BrowserConfig = {
+      ...browserConfig,
+      name: body.name || browserConfig.name,
+      period: body.period || browserConfig.period,
+      buttons: browserConfig.buttons.map(button => {
         // Update the selector for the element with id if name is provided
         if (button.selector.includes('id=')) {
           return {
             ...button,
-            selector: `[id="${body.name || defaultConfig.name}"]`
+            selector: `[id="${body.name || browserConfig.name}"]`
           };
         }
         // Update the searchText for period button if period is provided
         if (button.selector.includes('StyledChartDateRangeBtn')) {
           return {
             ...button,
-            searchText: body.period || defaultConfig.period
+            searchText: body.period || browserConfig.period
           };
         }
         return button;
@@ -85,7 +85,7 @@ export class BrowserController {
 
     const browser = await this.playwrightService.launchBrowser();
     const page = await browser.newPage({
-      viewport: config.viewport || { width: 1920, height: 1080 }
+      viewport: config.viewport
     });
     
     try {
