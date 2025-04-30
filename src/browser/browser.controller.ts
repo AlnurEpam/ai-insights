@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Res } from '@nestjs/common';
 import { Response } from 'express';
-import { PlaywrightService } from './playwright.service';
+import { PlaywrightService } from '../shared/playwright.service';
 import { ReportConfig, defaultConfig } from '../config/report-config';
 import { ApiOperation, ApiBody, ApiResponse, ApiTags, ApiProperty } from '@nestjs/swagger';
 
